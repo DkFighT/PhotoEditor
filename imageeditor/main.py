@@ -1,5 +1,5 @@
 import customtkinter as ct, ctypes, os, PIL
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, askdirectory
 from tkinter import Tk, Canvas, Frame, BOTH, NW
 from PIL import Image, ImageTk, ImageFilter, ImageEnhance
 
@@ -123,10 +123,15 @@ class App(ct.CTk):
 
     def save_image_func(self):
         if(self.end_img):
-            x, y = self.end_img.size[0], self.end_img.size[1]
-            self.end_img.resize((self.img.size[0], self.img.size[1]))
-            self.end_img.save('some.png', 'png', quality=100)
-            self.end_img.resize((x, y))
+            editable_image = self.img.rotate(self.rotate_value)
+            saturation = ImageEnhance.Color(editable_image).enhance(self.ench_value / 100)
+            contrast = ImageEnhance.Contrast(saturation).enhance(self.contr_value / 100)
+            brightness = ImageEnhance.Brightness(contrast).enhance(self.bright_value / 100)
+            sharpness = ImageEnhance.Sharpness(brightness).enhance(self.sharp_value / 100)
+
+            save_edit_img = sharpness
+            foldername = askdirectory()
+            save_edit_img.save(f'{foldername}/{(((self.img.filename).split("/"))[::-1])[0].split(".")[0]}.png', 'png', quality=100)
 
     def __del__(self):
         print('destroed!')
