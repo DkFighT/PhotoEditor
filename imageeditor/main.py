@@ -1,10 +1,96 @@
 import customtkinter as ct, ctypes, os, PIL, random
 from tkinter.filedialog import askopenfilename, askdirectory
-from tkinter import Tk, Canvas, Frame, BOTH, NW
 from PIL import Image, ImageTk, ImageFilter, ImageEnhance, ImageDraw
 
 user32 = ctypes.windll.user32
 screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+size_xy = [0, 0, 100, 100]
+
+class CropWindow(ct.CTkToplevel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.geometry(f'{round(screensize[0]*0.5)}x{round(screensize[1]*0.5)}+200+200')
+        self.title('Crop')
+        self.bind('<Escape>', lambda x: self.destroy())
+        self.overrideredirect(1)
+
+        # set grid layout 1x2
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+
+        # left panel
+        self.left_panel = ct.CTkFrame(self, width=200, corner_radius=10)
+        self.left_panel.grid(row=0, column=0, padx=10, pady=10, sticky="news")
+        self.left_panel.grid_rowconfigure(8, weight=1)
+
+        # work panel
+        self.field = ct.CTkFrame(self, fg_color='transparent', bg_color='transparent', width=700, corner_radius=10)
+        self.field.grid(row=0, column=1, sticky='nsew', padx=(0, 10), pady=10)
+        self.field.grid_rowconfigure(1, weight=1)
+
+        self.imageFrame = ct.CTkLabel(self.field, text='')
+        self.imageFrame.place(anchor="c", relx=.5, rely=.5)
+
+        self.left = ct.CTkLabel(self.left_panel, text='Left', text_color='#ffffff', bg_color='transparent')
+        self.left.grid(row=0, column=0, sticky="ew", pady=10)
+        self.left_btn = ct.CTkSlider(self.left_panel, from_=0, to=80, command=self.left_func)
+        self.left_btn.grid(row=1, column=0, sticky="ew", padx=10)
+        self.left_btn.set(size_xy[0])
+
+        self.top = ct.CTkLabel(self.left_panel, text='Top', text_color='#ffffff', bg_color='transparent')
+        self.top.grid(row=2, column=0, sticky="ew", pady=10)
+        self.top_btn = ct.CTkSlider(self.left_panel, from_=0, to=80, command=self.top_func)
+        self.top_btn.grid(row=3, column=0, sticky="ew", padx=10)
+        self.top_btn.set(size_xy[1])
+        
+        self.right = ct.CTkLabel(self.left_panel, text='Right', text_color='#ffffff', bg_color='transparent')
+        self.right.grid(row=4, column=0, sticky="ew", pady=10)
+        self.right_btn = ct.CTkSlider(self.left_panel, from_=20, to=100, command=self.right_func)
+        self.right_btn.grid(row=5, column=0, sticky="ew", padx=10)
+        self.right_btn.set(size_xy[2])
+
+        self.bottom = ct.CTkLabel(self.left_panel, text='Bottom', text_color='#ffffff', bg_color='transparent')
+        self.bottom.grid(row=6, column=0, sticky="ew", pady=10)
+        self.bottom_btn = ct.CTkSlider(self.left_panel, from_=20, to=100, command=self.bottom_func)
+        self.bottom_btn.grid(row=7, column=0, sticky="ew", padx=10)
+        self.bottom_btn.set(size_xy[3])
+
+        # ok button
+        self.ok_btn = ct.CTkButton(self.left_panel, command=self.ok_func, text='Ok')
+        self.ok_btn.grid(row=8, column=0, sticky="ews", pady=10, padx=10)
+
+        self.image = None
+
+    def left_func(self, value):
+        size_xy[0] = value
+        self.update_func()
+    def top_func(self, value):
+        size_xy[1] = value
+        self.update_func()
+    def right_func(self, value):
+        size_xy[2] = value
+        self.update_func()
+    def bottom_func(self, value):
+        size_xy[3] = value
+        self.update_func()
+
+    def create_image(self, image):
+        self.image = image
+        self.tatras = ImageTk.PhotoImage(self.image) # Вставляем изображение
+        self.imageFrame.configure(image=self.tatras)
+        self.update_func()
+
+    def ok_func(self):
+        app.update_func()
+        self.destroy()
+    
+    def update_func(self):
+        croped = self.image.crop((round(self.image.size[0] * (size_xy[0] / 100)), round(self.image.size[1] * (size_xy[1] / 100)), round(self.image.size[0] * (size_xy[2] / 100)), round(self.image.size[1] * (size_xy[3] / 100))))
+        self.tatras = ImageTk.PhotoImage(croped) # Вставляем изображение
+        self.imageFrame.configure(image=self.tatras)
+
+    def __del__(self):
+        print('New window closed')
 
 class App(ct.CTk):
     def __init__(self):
@@ -110,28 +196,36 @@ class App(ct.CTk):
 
         # reset button
         self.reset_btn = ct.CTkButton(self.settings_panel, command=self.reset_func, text='Reset')
-        self.reset_btn.grid(row=0, column=0)
+        self.reset_btn.grid(row=0, column=0, padx=5)
 
         # new image
         self.new_image_btn = ct.CTkButton(self.settings_panel, command=self.add_new_img, text='Add New Image')
-        self.new_image_btn.grid(row=0, column=1, padx=10)
+        self.new_image_btn.grid(row=0, column=1, padx=5)
+
+        # crop image button
+        self.crop_btn = ct.CTkButton(self.settings_panel, command=self.crop_func, text='Crop')
+        self.crop_btn.grid(row=0, column=2, padx=5)
 
         # field for photo download
         self.add_photo = ct.CTkButton(self.field, command=self.add_img, text='Upload Image')
         self.add_photo.place(anchor="c", relx=.5, rely=.5)
 
         self.zoom_value, self.rotate_value, self.ench_value, self.contr_value, self.bright_value, self.sharp_value, self.white_balance, self.shade, self.winiet, self.noise = 100, 0, 100, 100, 100, 100, 0, 0, 0, 0
+        self.window = None
+        self.new_img = None
 
     def add_img(self):
-        self.filename = askopenfilename()
-        if (self.filename):
+        self.filenamee = askopenfilename()
+        if (self.filenamee):
+            size_xy = [0, 0, 100, 100]
             self.fixed_width = self.field.winfo_width()
-            self.img = Image.open(self.filename)
+            self.img = Image.open(self.filenamee)
+            self.image_name = self.img.filename
+            self.img = self.img.convert('RGB')
             width_percent = (self.fixed_width / self.img.size[0])
             new_width = round(self.img.size[0] * width_percent)
             new_height = round(self.img.size[1] * width_percent)
             self.new_img = self.img.resize((new_width, new_height))
-            self.new_img = self.new_img.convert('RGB')
             if (self.add_photo):
                 self.add_photo.destroy()
                 self.add_photo = None
@@ -254,7 +348,17 @@ class App(ct.CTk):
         self.shade_btn.set(self.shade)
         self.winiet_btn.set(self.winiet)
         self.noise_btn.set(self.noise)
+        size_xy = [0, 0, 100, 100]
         self.update_func()
+    
+    def crop_func(self):
+        if (self.new_img):
+            if self.window is None or not self.window.winfo_exists():
+                self.window = CropWindow(self)
+                self.window.create_image(self.new_img)
+            else:
+                self.window.focus()
+            self.update_func()
 
     def update_func(self):
         new_resize_img = self.new_img.resize((round(self.new_img.size[0] * (self.zoom_value / 100)), round(self.new_img.size[1] * (self.zoom_value / 100))))
@@ -270,12 +374,15 @@ class App(ct.CTk):
         noise_img  = self.create_noise(shade_img)
         winiet_img = self.create_winiet(noise_img)
 
-        self.end_img = winiet_img
+        croped = winiet_img.crop((round(winiet_img.size[0] * (size_xy[0] / 100)), round(winiet_img.size[1] * (size_xy[1] / 100)), round(winiet_img.size[0] * (size_xy[2] / 100)), round(winiet_img.size[1] * (size_xy[3] / 100))))
+
+        self.end_img = croped
         self.tatras = ImageTk.PhotoImage(self.end_img)
         self.edit_image.configure(image=self.tatras)
 
     def save_image_func(self):
         if(self.end_img):
+            foldername = askdirectory()
             editable_image = self.img.rotate(self.rotate_value)
             saturation = ImageEnhance.Color(editable_image).enhance(self.ench_value / 100)
             contrast = ImageEnhance.Contrast(saturation).enhance(self.contr_value / 100)
@@ -287,10 +394,11 @@ class App(ct.CTk):
 
             noise_img  = self.create_noise(shade_img)
             winiet_img = self.create_winiet(noise_img)
+            croped = winiet_img.crop((round(winiet_img.size[0] * (size_xy[0] / 100)), round(winiet_img.size[1] * (size_xy[1] / 100)), round(winiet_img.size[0] * (size_xy[2] / 100)), round(winiet_img.size[1] * (size_xy[3] / 100))))
 
-            save_edit_img = winiet_img
-            foldername = askdirectory()
-            save_edit_img.save(f'{foldername}/{(((self.img.filename).split("/"))[::-1])[0].split(".")[0]}.png', 'png', quality=100)
+
+            save_edit_img = croped
+            save_edit_img.save(f'{foldername}/{(((self.image_name).split("/"))[::-1])[0].split(".")[0]}.png', 'png', quality=100)
 
     def __del__(self):
         print('destroed!')
